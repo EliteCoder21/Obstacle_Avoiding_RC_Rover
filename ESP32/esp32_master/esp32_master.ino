@@ -11,7 +11,10 @@
 // Define distance thresholds in centimeters
 #define CRITICAL_THRESHOLD 10
 #define OBSTACLE_THRESHOLD 30
-#define MAX_DISTANCE 200
+#define MAX_DISTANCE 100
+
+// Define turn amount
+#define TURN_TIME 200
 
 // Set up serial connection to Arduino Mega (motor slave)
 HardwareSerial SerialMega(2); 
@@ -61,7 +64,7 @@ void decisionTask(void *parameter) {
       currentDist = measuredDistanceCm;
       xSemaphoreGive(distanceMutex);
     } else {
-      currentDist = 100;
+      currentDist = MAX_DISTANCE;
     }
 
     // Make the Decision
@@ -71,7 +74,8 @@ void decisionTask(void *parameter) {
       Serial.println("Proximity Alert! Backtracking...");
 
       // Go back if we see something really close
-      SerialMega.println("BACKWARD");       
+      SerialMega.println("BACKWARD");   
+      vTaskDelay(pdMS_TO_TICKS(200)); 
 
     } else if (currentDist <= OBSTACLE_THRESHOLD) {
 
@@ -82,14 +86,14 @@ void decisionTask(void *parameter) {
 
       // Scan left
       SerialMega.println("LEFT");
-      vTaskDelay(pdMS_TO_TICKS(1000));
+      vTaskDelay(pdMS_TO_TICKS(TURN_TIME));
 
       // Record distance
       leftMeasuredDistanceCm = readUltrasonicCM();
 
       // Scan right
       SerialMega.println("RIGHT");
-      vTaskDelay(pdMS_TO_TICKS(2000));
+      vTaskDelay(pdMS_TO_TICKS(2 * TURN_TIME));
     
       // Record distance
       rightMeasuredDistanceCm = readUltrasonicCM();    
@@ -97,7 +101,7 @@ void decisionTask(void *parameter) {
       // Position the rover appropriately
       if (rightMeasuredDistanceCm < leftMeasuredDistanceCm) {
         SerialMega.println("LEFT");
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(2 * TURN_TIME));
       }
 
     } else {
@@ -105,11 +109,9 @@ void decisionTask(void *parameter) {
       // Debugging
       Serial.println("All clear! Proceeding forward...");
 
-      SerialMega.println("FORWARD");    
-    }
-
-    // Task Wait
-    vTaskDelay(pdMS_TO_TICKS(500));
+      SerialMega.println("FORWARD");   
+      vTaskDelay(pdMS_TO_TICKS(500)); 
+    }   
   
   }
 }
@@ -119,7 +121,7 @@ void sensorTask(void* pvParameters) {
   while (1) {
 
     // Read the value
-    int d = readUltrasonicCM();
+    unsigned int d = readUltrasonicCM();
 
     // Write the value
     if (xSemaphoreTake(distanceMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -145,15 +147,21 @@ void setup() {
 
   // Start up Serial
   Serial.begin(9600);
-  SerialMega.begin(9600, SERIAL_8N1, 16, 2); // RX, TX
+  SerialMega.begin(9600, SERIAL_8N1, 16, 2);
+
+  // Create the tasks
+  Serial.println("Initializing...");
 
   // Setup ultrasonic sensor and beeper pins
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  pinMode(ALARM_PIN, INPUT);
+  pinMode(ALARM_PIN, OUTPUT);
 
   // Create Mutex and give to Decision Task
   distanceMutex = xSemaphoreCreateMutex();
+
+  // Create the tasks
+  Serial.println("Creating Tasks...");
 
   // Create Tasks
   xTaskCreatePinnedToCore(
@@ -175,10 +183,6 @@ void setup() {
     &sensorTaskHandle,
     1                       // core 1
   );
-  
-  Serial.println("All tasks created...");
 }
 
-void loop() {
-  
-}
+void loop() {}
