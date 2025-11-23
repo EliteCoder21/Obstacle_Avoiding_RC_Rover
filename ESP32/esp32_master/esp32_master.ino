@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <NewPing.h>
 #include <semphr.h>
 
 // Define Pin constants
@@ -10,10 +10,14 @@
 
 // Define distance thresholds in centimeters
 #define CRITICAL_THRESHOLD 10
-#define OBSTACLE_THRESHOLD 20
+#define OBSTACLE_THRESHOLD 30
+#define MAX_DISTANCE 200
 
 // Set up serial connection to Arduino Mega (motor slave)
 HardwareSerial SerialMega(2); 
+
+// Create the Sonar object
+NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
 
 // Setup Distance Variable
 int measuredDistanceCm = 50;
@@ -33,64 +37,81 @@ SemaphoreHandle_t directionMutex = NULL;
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t decisionTaskHandle = NULL;
 
+// Function to get distance value
+unsigned int readUltrasonicCM() {
+  unsigned int distance = sonar.ping_cm(); 
+  
+  if(distance == 0) {
+    distance = MAX_DISTANCE;
+  }
+
+  Serial.println(distance);
+
+  return distance;
+}
+
 // Driving Decision Task
 void decisionTask(void *parameter) {
 
-  // Get the distance measured by the ultrasonic sensor
-  int currentDist;
-  if (xSemaphoreTake(distanceMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-    currentDist = measuredDistanceCm;
-    xSemaphoreGive(distanceMutex);
-  } else {
-    currentDist = 100;
-  }
+  while (1) {
 
-  // Make the Decision
-  if (currentDist <= CRITICAL_THRESHOLD) {
-
-    // Debugging
-    Serial.println("Proximity Alert! Backtracking...")
-
-    // Go back if we see something really close
-    SerialMega.println("BACKWARD");       
-
-  } else if (currentDist <= OBSTACLE_THRESHOLD) {
-
-    // Debugging
-    Serial.println("Obstacle Alert! Scanning for optimal route...")
-
-    // Scan around to find a safe path
-
-    // Scan left
-    SerialMega.println("LEFT");
-    vTaskDelay(pdMS_TO_TICKS(1000));
-
-    // Record distance
-    leftMeasuredDistanceCm = readUltrasonicCM();
-
-    // Scan right
-    SerialMega.println("RIGHT");
-    vTaskDelay(pdMS_TO_TICKS(2000));
-   
-    // Record distance
-    rightMeasuredDistanceCm = readUltrasonicCM();    
-
-    // Position the rover appropriately
-    if (rightMeasuredDistanceCm < leftMeasuredDistanceCm) {
-      SerialMega.println("LEFT");
-      vTaskDelay(pdMS_TO_TICKS(2000));
+    // Get the distance measured by the ultrasonic sensor
+    int currentDist;
+    if (xSemaphoreTake(distanceMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+      currentDist = measuredDistanceCm;
+      xSemaphoreGive(distanceMutex);
+    } else {
+      currentDist = 100;
     }
 
-  } else {
+    // Make the Decision
+    if (currentDist <= CRITICAL_THRESHOLD) {
 
-    // Debugging
-    Serial.println("All clear! Proceeding forward...")
+      // Debugging
+      Serial.println("Proximity Alert! Backtracking...");
 
-    SerialMega.println("FORWARD");    
+      // Go back if we see something really close
+      SerialMega.println("BACKWARD");       
+
+    } else if (currentDist <= OBSTACLE_THRESHOLD) {
+
+      // Debugging
+      Serial.println("Obstacle Alert! Scanning for optimal route...");
+
+      // Scan around to find a safe path
+
+      // Scan left
+      SerialMega.println("LEFT");
+      vTaskDelay(pdMS_TO_TICKS(1000));
+
+      // Record distance
+      leftMeasuredDistanceCm = readUltrasonicCM();
+
+      // Scan right
+      SerialMega.println("RIGHT");
+      vTaskDelay(pdMS_TO_TICKS(2000));
+    
+      // Record distance
+      rightMeasuredDistanceCm = readUltrasonicCM();    
+
+      // Position the rover appropriately
+      if (rightMeasuredDistanceCm < leftMeasuredDistanceCm) {
+        SerialMega.println("LEFT");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+      }
+
+    } else {
+
+      // Debugging
+      Serial.println("All clear! Proceeding forward...");
+
+      SerialMega.println("FORWARD");    
+    }
+
+    // Task Wait
+    vTaskDelay(pdMS_TO_TICKS(500));
+  
   }
-
-  // Task Wait
-  vTaskDelay(pdMS_TO_TICKS(500));
 }
 
 // Sensor task: periodically measures distance and updates shared variable
@@ -141,7 +162,7 @@ void setup() {
     4096,
     NULL,
     1,
-    &driveTaskHandle,
+    &decisionTaskHandle,
     0                       // core 0
   );
   
