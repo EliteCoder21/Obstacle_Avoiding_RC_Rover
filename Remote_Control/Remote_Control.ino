@@ -1,11 +1,19 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include "soc/timer_group_reg.h"
 
 // Button pin definitions
-#define BTN_LEFT_PIN    2    // TODO: change to your actual GPIO
-#define BTN_RIGHT_PIN   3    // TODO: change to your actual GPIO
-#define BTN_BACK_PIN    4    // TODO: change to your actual GPIO
+#define BTN_LEFT_PIN    2   
+#define BTN_RIGHT_PIN   3    
+#define BTN_BACK_PIN    4    
+#define SEND_COMMAND_PERIOD 50000 // in timer ticks (50,000 ticks = 50 ms at 1 MHz)
+#define TIMER_INCREMENT_MODE (1 << 30)
+#define TIMER_ENABLE (1 << 31)
+#define CLOCK_DIVIDER (80 << 13) //80 MHz / 80 = 1 MHz timer clock
+
+
+
 
 
 // Command enum & payload
@@ -26,7 +34,6 @@ typedef struct __attribute__((packed)) {
 // Globals
 // =========================
 
-// MAC address of the CAR ESP32 (fill this in from Serial.println(WiFi.macAddress()) on the car)
 uint8_t carPeerMac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }; // TODO: replace with real MAC
 
 CarCommand currentCmd = CMD_STOP;
@@ -38,9 +45,8 @@ unsigned long lastSendMs = 0;
 // ESP-NOW callback
 // =========================
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  // Optional: debug send status
-  // Serial.print("ESP-NOW send status: ");
-  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
+  Serial.print("ESP-NOW send status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
 }
 
 // =========================
@@ -113,9 +119,8 @@ void sendCurrentCommand() {
 
   esp_err_t result = esp_now_send(carPeerMac, (uint8_t*)&pkt, sizeof(pkt));
   if (result != ESP_OK) {
-    // Optional debug
-    // Serial.print("Error sending ESP-NOW packet: ");
-    // Serial.println(result);
+    Serial.print("Error sending ESP-NOW packet: ");
+    Serial.println(result);
   }
 }
 
@@ -125,6 +130,10 @@ void sendCurrentCommand() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
+  // Setup hardware timer for periodic tasks
+  uint32_t timer_config |= CLOCK_DIVIDER | TIMER_INCREMENT_MODE | TIMER_ENABLE;
+  *((volatile uint32_t *)TIMG_T0CONFIG_REG(0)) = timer_config;
 
   // Configure button pins (pull-up, active-low)
   pinMode(BTN_LEFT_PIN,  INPUT_PULLUP);
@@ -140,17 +149,20 @@ void setup() {
   Serial.println("Remote controller setup complete.");
 }
 
+static uint32_t last_toggle_time = 0;
+
 void loop() {
+  
   // 1) Read buttons and compute current command
   currentCmd = computeCommandFromButtons();
+  
+  // 2) Send at a fixed rate 
+  *((volatile uint32_t *)TIMG_T0UPDATE_REG(0)) = 1;
+  uint32_t current_time = *((volatile uint32_t *)TIMG_T0LO_REG(0));
 
-  // 2) Send at a fixed rate (e.g., 20 Hz)
-  unsigned long now = millis();
-  if (now - lastSendMs >= SEND_PERIOD_MS) {
+  if ((current_time - last_toggle_time) >= SEND_COMMAND_PERIOD) {
     sendCurrentCommand();
-    lastSendMs = now;
+    last_toggle_time = current_time;
   }
-
-  // Optional small delay to avoid spinning too fast
-  delay(5);
+  
 }
