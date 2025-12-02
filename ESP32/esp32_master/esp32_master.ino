@@ -75,7 +75,7 @@ void decisionTask(void *parameter) {
 
       // Go back if we see something really close
       SerialMega.println("BACKWARD");   
-      vTaskDelay(pdMS_TO_TICKS(200)); 
+      vTaskDelay(pdMS_TO_TICKS(500)); 
 
     } else if (currentDist <= OBSTACLE_THRESHOLD) {
 
