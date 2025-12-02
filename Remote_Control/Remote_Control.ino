@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
-#include "soc/timer_group_reg.h"
 
 // Button pin definitions
 #define BTN_LEFT_PIN    2    // TODO: change to your actual GPIO
@@ -35,10 +34,13 @@ CarCommand currentCmd = CMD_STOP;
 const unsigned long SEND_PERIOD_MS = 50;  // send command at 20 Hz
 unsigned long lastSendMs = 0;
 
-// ESP-NOW callback - For monitoring send status
+// =========================
+// ESP-NOW callback
+// =========================
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("ESP-NOW send status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
+  // Optional: debug send status
+  // Serial.print("ESP-NOW send status: ");
+  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
 }
 
 // =========================
@@ -149,5 +151,6 @@ void loop() {
     lastSendMs = now;
   }
 
-  // delay(5);
+  // Optional small delay to avoid spinning too fast
+  delay(5);
 }
