@@ -11,8 +11,8 @@
 #define ALARM_PIN 4
 
 // Define distance thresholds in centimeters
-#define CRITICAL_THRESHOLD 10
-#define OBSTACLE_THRESHOLD 30
+#define CRITICAL_THRESHOLD 8
+#define OBSTACLE_THRESHOLD 20
 #define MAX_DISTANCE 100
 
 // Define turn amount
