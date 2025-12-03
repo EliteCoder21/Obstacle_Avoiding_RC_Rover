@@ -9,12 +9,13 @@ Adafruit_DCMotor *leftMotor  = AFMS.getMotor(1); // M1
 Adafruit_DCMotor *rightMotor = AFMS.getMotor(2); // M2
 
 // Default speed (0–255)
-uint8_t defaultSpeed = 200;
+uint8_t defaultSpeed = 100;
 
 void setup() {
   Serial.begin(9600);      // Debug
   Serial1.begin(9600);     // ESP32 commands RX1 = Pin 19
-
+  
+  AFMS.begin();
   stopMotors();
   Serial.println("Mega ready to receive commands from ESP32.");
 }

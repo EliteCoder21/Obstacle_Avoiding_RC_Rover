@@ -4,17 +4,13 @@
 #include "soc/timer_group_reg.h"
 
 // Button pin definitions
-#define BTN_LEFT_PIN    2   
-#define BTN_RIGHT_PIN   3    
-#define BTN_BACK_PIN    4    
-#define SEND_COMMAND_PERIOD 50000 // in timer ticks (50,000 ticks = 50 ms at 1 MHz)
+#define BTN_LEFT_PIN    4   
+#define BTN_RIGHT_PIN   5    
+#define BTN_BACK_PIN    6    
+#define SEND_COMMAND_PERIOD 40000 // in timer ticks (50,000 ticks = 50 ms at 1 MHz)
 #define TIMER_INCREMENT_MODE (1 << 30)
 #define TIMER_ENABLE (1 << 31)
 #define CLOCK_DIVIDER (80 << 13) //80 MHz / 80 = 1 MHz timer clock
-
-
-
-
 
 // Command enum & payload
 typedef enum : uint8_t {
@@ -30,21 +26,19 @@ typedef struct __attribute__((packed)) {
   uint8_t cmd;   // CarCommand encoded as uint8_t
 } ControlPacket;
 
-// =========================
-// Globals
-// =========================
+// -----Globals-----
+//98:A3:16:F5:F9:54 //this is Asaf's esp32 with usb c
+//B8:F8:62:E0:84:2C //this is the car esp32
 
-uint8_t carPeerMac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }; // TODO: replace with real MAC
+uint8_t carPeerMac[] = { 0xB8, 0xF8, 0x62, 0xE0, 0x84, 0x2C }; 
 
 CarCommand currentCmd = CMD_STOP;
 
-const unsigned long SEND_PERIOD_MS = 50;  // send command at 20 Hz
-unsigned long lastSendMs = 0;
 
 // =========================
 // ESP-NOW callback
 // =========================
-void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
   Serial.print("ESP-NOW send status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
 }
@@ -103,11 +97,12 @@ void setupEspNow() {
   peerInfo.channel = 0;   // 0 = current WiFi channel
   peerInfo.encrypt = false;
 
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+  while (esp_now_add_peer(&peerInfo) != ESP_OK) {
     Serial.println("Failed to add ESP-NOW peer");
-  } else {
-    Serial.println("ESP-NOW peer added");
+    delay(100);
   }
+  Serial.println("ESP-NOW peer added");
+
 }
 
 // =========================
@@ -128,11 +123,11 @@ void sendCurrentCommand() {
 // Arduino setup / loop
 // =========================
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   delay(1000);
 
   // Setup hardware timer for periodic tasks
-  uint32_t timer_config |= CLOCK_DIVIDER | TIMER_INCREMENT_MODE | TIMER_ENABLE;
+  uint32_t timer_config = CLOCK_DIVIDER | TIMER_INCREMENT_MODE | TIMER_ENABLE;
   *((volatile uint32_t *)TIMG_T0CONFIG_REG(0)) = timer_config;
 
   // Configure button pins (pull-up, active-low)
@@ -155,7 +150,7 @@ void loop() {
   
   // 1) Read buttons and compute current command
   currentCmd = computeCommandFromButtons();
-  
+
   // 2) Send at a fixed rate 
   *((volatile uint32_t *)TIMG_T0UPDATE_REG(0)) = 1;
   uint32_t current_time = *((volatile uint32_t *)TIMG_T0LO_REG(0));
@@ -163,6 +158,8 @@ void loop() {
   if ((current_time - last_toggle_time) >= SEND_COMMAND_PERIOD) {
     sendCurrentCommand();
     last_toggle_time = current_time;
+    Serial.println(currentCmd);
+
   }
   
 }
