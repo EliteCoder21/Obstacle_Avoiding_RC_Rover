@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <NewPing.h>
 #include <semphr.h>
+#include <WiFi.h>
+#include <esp_now.h>  
+#include <NewPing.h> 
 
 // Define Pin constants
 #define TRIG_PIN 5
@@ -10,17 +12,34 @@
 
 // Define distance thresholds in centimeters
 #define CRITICAL_THRESHOLD 10
-#define OBSTACLE_THRESHOLD 30
+#define OBSTACLE_THRESHOLD 15
 #define MAX_DISTANCE 100
 
 // Define turn amount
-#define TURN_TIME 200
+#define TURN_TIME 100
+
+// Command enum & payload 
+typedef enum : uint8_t {
+  CMD_STOP = 0,
+  CMD_FORWARD,
+  CMD_BACKWARD,
+  CMD_LEFT,
+  CMD_RIGHT
+} CarCommand;
+
+CarCommand remoteCommand = CMD_STOP;
+
+
+typedef struct __attribute__((packed)) {
+  uint8_t cmd;
+} ControlPacket;
 
 // Set up serial connection to Arduino Mega (motor slave)
 HardwareSerial SerialMega(2); 
 
 // Create the Sonar object
 NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
+
 
 // Setup Distance Variable
 int measuredDistanceCm = 50;
@@ -35,6 +54,7 @@ int bestDirection = 1; // 0 is for left
 // Setup Semaphores for safety tracking
 SemaphoreHandle_t distanceMutex  = NULL;
 SemaphoreHandle_t directionMutex = NULL;
+SemaphoreHandle_t commandMutex = NULL;
 
 // Setup Task handles for tasks
 TaskHandle_t sensorTaskHandle = NULL;
@@ -53,6 +73,39 @@ unsigned int readUltrasonicCM() {
   return distance;
 }
 
+
+void receiveCommand(const esp_now_recv_info_t *recv_info, const uint8_t *incomingData, int len) {
+  // Validate length
+  if (len != sizeof(ControlPacket)) {
+    Serial.print("Error: Invalid packet size. Expected ");
+    Serial.print(sizeof(ControlPacket));
+    Serial.print(" bytes, got ");
+    Serial.println(len);
+    return;
+  }
+
+  // Cast incoming data to ControlPacket struct and extract command
+  const ControlPacket *pkt = (const ControlPacket *)incomingData;
+  CarCommand cmd = (CarCommand)pkt->cmd;
+
+  // Store command safely with mutex
+  if (xSemaphoreTake(commandMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    remoteCommand = cmd;
+    xSemaphoreGive(commandMutex);
+  }
+
+  // debug only prints
+  switch (cmd) {
+    case CMD_STOP:    Serial.println("Command: STOP");    break;
+    case CMD_FORWARD: Serial.println("Command: FORWARD"); break;
+    case CMD_BACKWARD:Serial.println("Command: BACKWARD");break;
+    case CMD_LEFT:    Serial.println("Command: LEFT");    break;
+    case CMD_RIGHT:   Serial.println("Command: RIGHT");   break;
+    default:          Serial.println("Command: UNKNOWN");  break;
+  }
+}
+
+
 // Driving Decision Task
 void decisionTask(void *parameter) {
 
@@ -67,50 +120,53 @@ void decisionTask(void *parameter) {
       currentDist = MAX_DISTANCE;
     }
 
+    // Get the remote command
+    CarCommand cmd = CMD_STOP;
+    if (xSemaphoreTake(commandMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+      cmd = remoteCommand;
+      xSemaphoreGive(commandMutex);
+    }
+
     // Make the Decision
     if (currentDist <= CRITICAL_THRESHOLD) {
 
       // Debugging
       Serial.println("Proximity Alert! Backtracking...");
 
-      // Go back if we see something really close
+      // Go back for a short time
       SerialMega.println("BACKWARD");   
-      vTaskDelay(pdMS_TO_TICKS(500)); 
+      vTaskDelay(pdMS_TO_TICKS(TURN_TIME)); 
 
     } else if (currentDist <= OBSTACLE_THRESHOLD) {
 
       // Debugging
-      Serial.println("Obstacle Alert! Scanning for optimal route...");
+      Serial.println("Obstacle Alert! Backtracking...");
 
-      // Scan around to find a safe path
-
-      // Scan left
-      SerialMega.println("LEFT");
-      vTaskDelay(pdMS_TO_TICKS(TURN_TIME));
-
-      // Record distance
-      leftMeasuredDistanceCm = readUltrasonicCM();
-
-      // Scan right
-      SerialMega.println("RIGHT");
-      vTaskDelay(pdMS_TO_TICKS(2 * TURN_TIME));
-    
-      // Record distance
-      rightMeasuredDistanceCm = readUltrasonicCM();    
-
-      // Position the rover appropriately
-      if (rightMeasuredDistanceCm < leftMeasuredDistanceCm) {
-        SerialMega.println("LEFT");
-        vTaskDelay(pdMS_TO_TICKS(2 * TURN_TIME));
-      }
+      // Back up for a short time, then return control to user
+      SerialMega.println("BACKWARD");   
+      vTaskDelay(pdMS_TO_TICKS(TURN_TIME)); 
 
     } else {
 
-      // Debugging
-      Serial.println("All clear! Proceeding forward...");
-
-      SerialMega.println("FORWARD");   
-      vTaskDelay(pdMS_TO_TICKS(500)); 
+      // No obstacle, follow remote command
+      switch (cmd) {
+        case CMD_STOP:
+          SerialMega.println("STOP");
+          break;
+        case CMD_FORWARD:
+          SerialMega.println("FORWARD");
+          break;
+        case CMD_BACKWARD:
+          SerialMega.println("BACKWARD");
+          break;
+        case CMD_LEFT:
+          SerialMega.println("LEFT");
+          break;
+        case CMD_RIGHT:
+          SerialMega.println("RIGHT");
+          break;
+      }
+      vTaskDelay(pdMS_TO_TICKS(50)); 
     }   
   
   }
@@ -159,6 +215,20 @@ void setup() {
 
   // Create Mutex and give to Decision Task
   distanceMutex = xSemaphoreCreateMutex();
+  commandMutex = xSemaphoreCreateMutex();
+
+  // Setup WiFi and ESP-NOW
+  Serial.println("Initializing WiFi and ESP-NOW...");
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+  } else {
+    Serial.println("ESP-NOW initialized");
+    esp_now_register_recv_cb(receiveCommand);
+  }
+
 
   // Create the tasks
   Serial.println("Creating Tasks...");

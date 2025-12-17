@@ -3,10 +3,9 @@
 #include <esp_now.h>
 
 // Button pin definitions
-#define BTN_LEFT_PIN    2    // TODO: change to your actual GPIO
-#define BTN_RIGHT_PIN   3    // TODO: change to your actual GPIO
-#define BTN_BACK_PIN    4    // TODO: change to your actual GPIO
-
+#define BTN_LEFT_PIN    4    
+#define BTN_RIGHT_PIN   5    
+#define BTN_BACK_PIN    6
 
 // Command enum & payload
 typedef enum : uint8_t {

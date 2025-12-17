@@ -1,20 +1,51 @@
-// ESP32-S3 Analog IR sensor reader
-
-#define IR_SENSOR_PIN 16
+const int rxPin = 6;
 
 void setup() {
+  pinMode(rxPin, INPUT);
   Serial.begin(9600);
-  delay(500);
 
-  Serial.println("IR Sensor Reading on GPIO16");
+  Serial.println("Hello!");
+}
+
+unsigned long pulseIn2(int pin, int state, unsigned long timeout = 100000) {
+  // pulseIn but works better on ESP32
+  int lastState = digitalRead(pin);
+
+  Serial.println(lastState);
+
+  unsigned long start = micros();
+  
+  while (digitalRead(pin) == lastState) {
+    if (micros() - start > timeout) return 0;
+  }
+
+  unsigned long begin = micros();
+  while (digitalRead(pin) == state) {
+    if (micros() - begin > timeout) return 0;
+  }
+
+  return micros() - begin;
 }
 
 void loop() {
-  // Read raw ADC value (0–4095 on ESP32-S3)
-  int irValue = analogRead(IR_SENSOR_PIN);
+  // Wait for long leading burst
+  unsigned long p = pulseIn2(rxPin, LOW);
+  if (p < 8000) return;   // not a valid lead pulse
 
-  Serial.print("IR Value: ");
-  Serial.println(irValue);
+  // Wait for space
+  p = pulseIn2(rxPin, HIGH);
+  if (p < 4000) return;
 
-  delay(100);
+  // Read 8 data bits
+  byte value = 0;
+
+  for (int i = 0; i < 8; i++) {
+    unsigned long burst = pulseIn2(rxPin, LOW);
+    unsigned long space = pulseIn2(rxPin, HIGH);
+
+    if (space > 1000) value |= (1 << i);  // bit=1
+  }
+
+  Serial.print("Got: ");
+  Serial.println((char)value);
 }

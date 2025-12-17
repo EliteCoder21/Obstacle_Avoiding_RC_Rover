@@ -14,6 +14,13 @@ uint8_t defaultSpeed = 200;
 void setup() {
   Serial.begin(9600);      // Debug
   Serial1.begin(9600);     // ESP32 commands RX1 = Pin 19
+  if (AFMS.begin()) {
+    Serial.println("INIT MOTOR DRIVER");
+  } else {
+    Serial.println("Failed!");
+
+    while (true) {}
+  }
 
   stopMotors();
   Serial.println("Mega ready to receive commands from ESP32.");
