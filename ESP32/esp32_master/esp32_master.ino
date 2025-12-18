@@ -1,3 +1,19 @@
+/**
+ * @file esp32_master.ino
+ * @brief Master ESP32-S3 node for an obstacle-avoiding RC rover.
+ *
+ * Receives high-level drive commands over ESP-NOW from a remote controller,
+ * measures obstacle distance with an ultrasonic sensor, and forwards safe
+ * motion commands to an Arduino Mega motor driver over serial. Basic safety
+ * logic overrides user commands when obstacles are detected.
+ */
+
+// Filename: esp32_master/esp32_master.ino
+// Author(s): Aaryan Pawar, Asaf Iron-Jobes
+// Date: 12/03/2025
+// Description: Esp32 Master code for obstacle avoiding RC rover. 
+//Uses the esp32s3 and connects to the arduino mega motor driver via serial communication.
+// It also uses an ultrasonic sensor to measure distance to obstacles and makes driving decisions accordingly.
 #include <Arduino.h>
 #include <Wire.h>
 #include <semphr.h>
@@ -11,14 +27,29 @@
 #define ALARM_PIN 4
 
 // Define distance thresholds in centimeters
+<<<<<<< HEAD
 #define CRITICAL_THRESHOLD 10
 #define OBSTACLE_THRESHOLD 15
+=======
+#define CRITICAL_THRESHOLD 8
+#define OBSTACLE_THRESHOLD 20
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 #define MAX_DISTANCE 100
 
 // Define turn amount
 #define TURN_TIME 100
 
+<<<<<<< HEAD
 // Command enum & payload 
+=======
+/**
+ * @enum CarCommand
+ * @brief High-level motion commands for the rover.
+ *
+ * These commands are received from the remote controller over ESP-NOW and
+ * translated into serial strings for the Arduino Mega motor driver.
+ */
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 typedef enum : uint8_t {
   CMD_STOP = 0,
   CMD_FORWARD,
@@ -27,11 +58,25 @@ typedef enum : uint8_t {
   CMD_RIGHT
 } CarCommand;
 
+<<<<<<< HEAD
 CarCommand remoteCommand = CMD_STOP;
 
 
 typedef struct __attribute__((packed)) {
   uint8_t cmd;
+=======
+// Latest command received from the remote controller.
+CarCommand remoteCommand = CMD_STOP;
+
+/**
+ * @struct ControlPacket
+ * @brief ESP-NOW control packet carrying a single command.
+ *
+ * Packed to avoid any padding so that the sender and receiver agree on size.
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t cmd;   ///< Encoded CarCommand value.
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 } ControlPacket;
 
 // Set up serial connection to Arduino Mega (motor slave)
@@ -43,24 +88,29 @@ NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
 
 // Setup Distance Variable
 int measuredDistanceCm = 50;
-int leftMeasuredDistanceCm = 50;
-int rightMeasuredDistanceCm = 50;
 
-// Setup best direction variable
-int bestDirection = 1; // 0 is for left
-                       // 1 is for forward
-                       // 2 is for right                       
-
+                    
 // Setup Semaphores for safety tracking
 SemaphoreHandle_t distanceMutex  = NULL;
+<<<<<<< HEAD
 SemaphoreHandle_t directionMutex = NULL;
+=======
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 SemaphoreHandle_t commandMutex = NULL;
 
 // Setup Task handles for tasks
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t decisionTaskHandle = NULL;
 
-// Function to get distance value
+/**
+ * @brief Read distance from the ultrasonic sensor in centimeters.
+ *
+ * Uses the NewPing library to trigger a measurement. If no echo is detected
+ * (raw distance is 0), this is treated as MAX_DISTANCE so that logic can
+ * assume a large distance instead of a failed reading.
+ *
+ * @return Distance to the nearest obstacle in centimeters, with 0 mapped to MAX_DISTANCE.
+ */
 unsigned int readUltrasonicCM() {
   unsigned int distance = sonar.ping_cm(); 
   
@@ -73,7 +123,21 @@ unsigned int readUltrasonicCM() {
   return distance;
 }
 
+<<<<<<< HEAD
 
+=======
+/**
+ * @brief ESP-NOW receive callback for processing incoming remote commands.
+ *
+ * Validates the packet size, extracts the ControlPacket payload, and updates
+ * the shared remoteCommand under a mutex. Also prints a human-readable log
+ * of the received command over the debug serial port.
+ *
+ * @param recv_info Metadata about the received ESP-NOW packet (unused here).
+ * @param incomingData Pointer to the raw packet data.
+ * @param len Length of the incoming packet in bytes.
+ */
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 void receiveCommand(const esp_now_recv_info_t *recv_info, const uint8_t *incomingData, int len) {
   // Validate length
   if (len != sizeof(ControlPacket)) {
@@ -105,8 +169,21 @@ void receiveCommand(const esp_now_recv_info_t *recv_info, const uint8_t *incomin
   }
 }
 
+<<<<<<< HEAD
 
 // Driving Decision Task
+=======
+/**
+ * @brief FreeRTOS task that decides safe motion based on distance and remote command.
+ *
+ * This task periodically reads the latest distance measurement and remote
+ * command (both protected by mutexes). When an obstacle is too close, it
+ * overrides the user command and backs up; otherwise, it forwards the latest
+ * user command to the motor controller.
+ *
+ * @param parameter Unused pointer required by the FreeRTOS task signature.
+ */
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 void decisionTask(void *parameter) {
 
   while (1) {
@@ -172,7 +249,15 @@ void decisionTask(void *parameter) {
   }
 }
 
-// Sensor task: periodically measures distance and updates shared variable
+/**
+ * @brief FreeRTOS task that periodically measures distance and updates the shared state.
+ *
+ * Continuously reads the ultrasonic sensor, writes the latest distance into
+ * the shared measuredDistanceCm variable under a mutex, and toggles the alarm
+ * output when an obstacle is closer than CRITICAL_THRESHOLD.
+ *
+ * @param pvParameters Unused pointer required by the FreeRTOS task signature.
+ */
 void sensorTask(void* pvParameters) {
   while (1) {
 
@@ -198,7 +283,13 @@ void sensorTask(void* pvParameters) {
   }
 }
 
-// Setup function
+/**
+ * @brief Arduino setup function that initializes hardware, ESP-NOW, and tasks.
+ *
+ * Configures serial ports, ultrasonic and alarm pins, creates mutexes, sets
+ * up Wi-Fi in station mode, initializes ESP-NOW with a receive callback, and
+ * starts the decision and sensor tasks pinned to different cores.
+ */
 void setup() {
 
   // Start up Serial
@@ -228,7 +319,10 @@ void setup() {
     Serial.println("ESP-NOW initialized");
     esp_now_register_recv_cb(receiveCommand);
   }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 
   // Create the tasks
   Serial.println("Creating Tasks...");
@@ -255,4 +349,12 @@ void setup() {
   );
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * @brief Main Arduino loop left intentionally empty.
+ *
+ * All logic is handled in FreeRTOS tasks started in setup().
+ */
+>>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
 void loop() {}
