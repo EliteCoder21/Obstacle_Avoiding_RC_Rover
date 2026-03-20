@@ -6,12 +6,16 @@
  * periodically to the rover over ESP-NOW. A hardware timer is used to
  * pace command transmissions at a fixed rate.
  *
- * Buttons:
- *  - Left  button: turn left
- *  - Right button: turn right
- *  - Both  buttons: drive forward
- *  - Back  button: reverse (highest priority)
- *  - No buttons: stop
+ * Button Layout:
+ *  - Left button:  Turn left
+ *  - Right button: Turn right
+ *  - Both buttons: Drive forward
+ *  - Back button:  Reverse (highest priority)
+ *  - No buttons:   Stop
+ *
+ * @author Aaryan Pawar, Asaf Iron-Jobes
+ * @date December 2024
+ * @course CSE 474 - Embedded Systems
  */
 
 #include <Arduino.h>
@@ -19,22 +23,26 @@
 #include <esp_now.h>
 #include "soc/timer_group_reg.h"
 
-// Button pin definitions
-<<<<<<< HEAD
-#define BTN_LEFT_PIN    4    
-#define BTN_RIGHT_PIN   5    
-#define BTN_BACK_PIN    6
-=======
-#define BTN_LEFT_PIN    4   
-#define BTN_RIGHT_PIN   5    
-#define BTN_BACK_PIN    6    
+/** GPIO pin for left direction button (active-low with pull-up) */
+#define BTN_LEFT_PIN    4
 
-// Periodic send timing based on hardware timer (1 MHz clock)
-#define SEND_COMMAND_PERIOD 40000 // in timer ticks (40,000 ticks = 40 ms at 1 MHz)
+/** GPIO pin for right direction button (active-low with pull-up) */
+#define BTN_RIGHT_PIN   5
+
+/** GPIO pin for reverse/back button (active-low with pull-up) */
+#define BTN_BACK_PIN    6
+
+/** Periodic send interval in hardware timer ticks (40ms at 1MHz) */
+#define SEND_COMMAND_PERIOD 40000
+
+/** Timer configuration: increment mode */
 #define TIMER_INCREMENT_MODE (1 << 30)
+
+/** Timer configuration: enable timer */
 #define TIMER_ENABLE (1 << 31)
-#define CLOCK_DIVIDER (80 << 13) //80 MHz / 80 = 1 MHz timer clock
->>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
+
+/** Clock divider: 80 MHz / 80 = 1 MHz timer clock */
+#define CLOCK_DIVIDER (80 << 13)
 
 /**
  * @enum CarCommand
@@ -59,22 +67,18 @@ typedef enum : uint8_t {
  * sender and receiver agree on the payload size.
  */
 typedef struct __attribute__((packed)) {
-  uint8_t cmd;   // CarCommand encoded as uint8_t
+  uint8_t cmd;
 } ControlPacket;
 
-// -----Globals-----
-//98:A3:16:F5:F9:54 //this is Asaf's esp32 with usb c
-//B8:F8:62:E0:84:2C //this is the car esp32
-
-// MAC address of the rover's ESP32 (ESP-NOW peer)
+/**
+ * @brief MAC address of the rover's ESP32 receiver.
+ *
+ * Peer address for ESP-NOW communication with the rover.
+ */
 uint8_t carPeerMac[] = { 0xB8, 0xF8, 0x62, 0xE0, 0x84, 0x2C }; 
 
-// Latest command computed from button state
+/** Latest command computed from button state */
 CarCommand currentCmd = CMD_STOP;
-
-// =========================
-// ESP-NOW callback
-// =========================
 
 /**
  * @brief ESP-NOW send callback for reporting transmission status.
@@ -88,10 +92,6 @@ void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
   Serial.print("ESP-NOW send status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "SUCCESS" : "FAIL");
 }
-
-// =========================
-// Button helper
-// =========================
 
 /**
  * @brief Check if a button connected to the given pin is pressed.
@@ -123,11 +123,6 @@ CarCommand computeCommandFromButtons() {
   bool rightPressed = isButtonPressed(BTN_RIGHT_PIN);
   bool backPressed  = isButtonPressed(BTN_BACK_PIN);
 
-  // Priority logic:
-  //  1) Back button overrides everything
-  //  2) Left + Right together = forward
-  //  3) Left only or Right only for turning
-  //  4) No buttons = stop
   if (backPressed) {
     return CMD_BACKWARD;
   } else if (leftPressed && rightPressed) {
@@ -141,10 +136,6 @@ CarCommand computeCommandFromButtons() {
   }
 }
 
-// =========================
-// ESP-NOW setup
-// =========================
-
 /**
  * @brief Initialize ESP-NOW and register the rover as a peer.
  *
@@ -152,19 +143,19 @@ CarCommand computeCommandFromButtons() {
  * the carPeerMac as a peer. Retries adding the peer until success.
  */
 void setupEspNow() {
-  // Init ESP-NOW
+  /** Initialize ESP-NOW */
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
 
-  // Register send callback (optional but nice for debugging)
+  /** Register send callback for debugging */
   esp_now_register_send_cb(onDataSent);
 
-  // Register peer (the car ESP32)
+  /** Register the car ESP32 as a peer */
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, carPeerMac, 6);
-  peerInfo.channel = 0;   // 0 = current WiFi channel
+  peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
   while (esp_now_add_peer(&peerInfo) != ESP_OK) {
@@ -172,12 +163,7 @@ void setupEspNow() {
     delay(100);
   }
   Serial.println("ESP-NOW peer added");
-
 }
-
-// =========================
-// Send function
-// =========================
 
 /**
  * @brief Send the current command to the rover over ESP-NOW.
@@ -196,10 +182,6 @@ void sendCurrentCommand() {
   }
 }
 
-// =========================
-// Arduino setup / loop
-// =========================
-
 /**
  * @brief Arduino setup function.
  *
@@ -211,25 +193,25 @@ void setup() {
   Serial.begin(9600);
   delay(1000);
 
-  // Setup hardware timer for periodic tasks
+  /** Configure hardware timer for periodic command transmission */
   uint32_t timer_config = CLOCK_DIVIDER | TIMER_INCREMENT_MODE | TIMER_ENABLE;
   *((volatile uint32_t *)TIMG_T0CONFIG_REG(0)) = timer_config;
 
-  // Configure button pins (pull-up, active-low)
+  /** Configure button pins as inputs with pull-up resistors (active-low) */
   pinMode(BTN_LEFT_PIN,  INPUT_PULLUP);
   pinMode(BTN_RIGHT_PIN, INPUT_PULLUP);
   pinMode(BTN_BACK_PIN,  INPUT_PULLUP);
 
-  // ESP32 must be in STA mode for ESP-NOW
+  /** Configure Wi-Fi in station mode for ESP-NOW */
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();  // not strictly required, but keeps things clean
+  WiFi.disconnect();
 
   setupEspNow();
 
   Serial.println("Remote controller setup complete.");
 }
 
-// Timestamp of last command send based on hardware timer ticks
+/** Timestamp of last command send based on hardware timer ticks */
 static uint32_t last_toggle_time = 0;
 
 /**
@@ -239,11 +221,10 @@ static uint32_t last_toggle_time = 0;
  * it to the rover at a fixed rate using the hardware timer as a timebase.
  */
 void loop() {
-  
-  // 1) Read buttons and compute current command
+  /** Read buttons and compute current command */
   currentCmd = computeCommandFromButtons();
 
-  // 2) Send at a fixed rate 
+  /** Send at a fixed rate using hardware timer */
   *((volatile uint32_t *)TIMG_T0UPDATE_REG(0)) = 1;
   uint32_t current_time = *((volatile uint32_t *)TIMG_T0LO_REG(0));
 
@@ -251,7 +232,5 @@ void loop() {
     sendCurrentCommand();
     last_toggle_time = current_time;
     Serial.println(currentCmd);
-
   }
-  
 }

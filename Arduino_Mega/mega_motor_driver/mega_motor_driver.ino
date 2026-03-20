@@ -9,19 +9,25 @@
  * Motors:
  *  - M1 = leftMotor
  *  - M2 = rightMotor
+ *
+ * @author Aaryan Pawar, Asaf Iron-Jobes
+ * @date December 2024
+ * @course CSE 474 - Embedded Systems
  */
 
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 
-// Create the motor shield object
+/** Motor shield instance for controlling DC motors */
 Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
 
-// Motors on M1 and M2
-Adafruit_DCMotor *leftMotor  = AFMS.getMotor(1); // M1
-Adafruit_DCMotor *rightMotor = AFMS.getMotor(2); // M2
+/** Left motor connected to M1 on the motor shield */
+Adafruit_DCMotor *leftMotor  = AFMS.getMotor(1);
 
-// Default speed (0–255)
+/** Right motor connected to M2 on the motor shield */
+Adafruit_DCMotor *rightMotor = AFMS.getMotor(2);
+
+/** Default motor speed (0-255 range) */
 uint8_t defaultSpeed = 100;
 
 /**
@@ -31,21 +37,21 @@ uint8_t defaultSpeed = 100;
  * are stopped before entering the main loop.
  */
 void setup() {
-  Serial.begin(9600);      // Debug
-  Serial1.begin(9600);     // ESP32 commands RX1 = Pin 19
-<<<<<<< HEAD
+  /** Initialize debug serial port at 9600 baud */
+  Serial.begin(9600);
+
+  /** Initialize Serial1 for ESP32 communication (RX1 = Pin 19) */
+  Serial1.begin(9600);
+
+  /** Initialize the motor shield */
   if (AFMS.begin()) {
     Serial.println("INIT MOTOR DRIVER");
   } else {
     Serial.println("Failed!");
-
     while (true) {}
   }
 
-=======
-  
-  AFMS.begin();
->>>>>>> 5852e8ffe2c0882258f49bd39ec8ff2669c4e93c
+  /** Ensure motors are stopped on startup */
   stopMotors();
   Serial.println("Mega ready to receive commands from ESP32.");
 }
@@ -57,10 +63,10 @@ void setup() {
  * appropriate motor control function.
  */
 void loop() {
-  // Check if ESP32 sent a command
+  /** Check if ESP32 sent a command */
   if (Serial1.available()) {
     String cmd = Serial1.readStringUntil('\n');
-    cmd.trim();  // Remove whitespace/newlines
+    cmd.trim();
 
     Serial.print("Received: ");
     Serial.println(cmd);
@@ -86,11 +92,9 @@ void loop() {
   }
 }
 
-// ================= Motor Control Functions =================
-
 /**
  * @brief Drives both motors forward at the specified speed.
- * @param speed Motor speed (0–255).
+ * @param speed Motor speed (0-255).
  */
 void driveForward(uint8_t speed) {
   leftMotor->setSpeed(speed);
@@ -101,7 +105,7 @@ void driveForward(uint8_t speed) {
 
 /**
  * @brief Drives both motors backward at the specified speed.
- * @param speed Motor speed (0–255).
+ * @param speed Motor speed (0-255).
  */
 void driveBackward(uint8_t speed) {
   leftMotor->setSpeed(speed);
@@ -112,7 +116,7 @@ void driveBackward(uint8_t speed) {
 
 /**
  * @brief Turns the rover left by reversing the left wheel and driving the right wheel forward.
- * @param speed Motor speed (0–255).
+ * @param speed Motor speed (0-255).
  */
 void turnLeft(uint8_t speed) {
   leftMotor->setSpeed(speed);
@@ -123,7 +127,7 @@ void turnLeft(uint8_t speed) {
 
 /**
  * @brief Turns the rover right by driving the left wheel forward and reversing the right wheel.
- * @param speed Motor speed (0–255).
+ * @param speed Motor speed (0-255).
  */
 void turnRight(uint8_t speed) {
   leftMotor->setSpeed(speed);

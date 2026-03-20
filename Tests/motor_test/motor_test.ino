@@ -1,43 +1,77 @@
+/**
+ * @file motor_test.ino
+ * @brief Motor driver test for the RC rover.
+ *
+ * Tests basic DC motor control using PWM speed control and directional
+ * switching via H-bridge logic. Validates motor driver functionality
+ * before integration with the main rover system.
+ *
+ * @author Aaryan Pawar, Asaf Iron-Jobes
+ * @date December 2024
+ * @course CSE 474 - Embedded Systems
+ */
+
 #include <Arduino.h>
 
-// Motor A connections
-int enA = 11;  // ENA pin
-int in1 = 10;  // IN1 pin
-int in2 = 9;  // IN2 pin
+/** Motor A enable pin (PWM speed control) */
+int enA = 11;
 
-// Motor B connections
-int enB = 14;  // ENB pin
-int in3 = 13;  // IN3 pin
-int in4 = 12;  // IN4 pin
+/** Motor A direction pin 1 */
+int in1 = 10;
 
-// PWM properties
-const int freq = 1000;        // PWM frequency
-const int pwmChannelA = 0;    // PWM channel for motor A
-const int pwmChannelB = 1;    // PWM channel for motor B
-const int resolution = 8;     // 8-bit resolution (0-255)
+/** Motor A direction pin 2 */
+int in2 = 9;
 
+/** Motor B enable pin (PWM speed control) */
+int enB = 14;
+
+/** Motor B direction pin 1 */
+int in3 = 13;
+
+/** Motor B direction pin 2 */
+int in4 = 12;
+
+/** PWM frequency in Hz */
+const int freq = 1000;
+
+/** PWM channel for motor A */
+const int pwmChannelA = 0;
+
+/** PWM channel for motor B */
+const int pwmChannelB = 1;
+
+/** PWM resolution in bits (8-bit = 0-255) */
+const int resolution = 8;
+
+/**
+ * @brief Arduino setup function.
+ *
+ * Initializes motor control pins as outputs and configures PWM channels
+ * for speed control. Motors are initially stopped.
+ */
 void setup() {
-  // Set all the motor control pins to outputs
+  /** Configure motor direction control pins as outputs */
   pinMode(in1, OUTPUT);
   pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
-  
-  // Configure PWM for motor speed control using new API
+
+  /** Attach enable pins to PWM channels */
   ledcAttachChannel(enA, freq, resolution, pwmChannelA);
   ledcAttachChannel(enB, freq, resolution, pwmChannelB);
-  
-  // Turn off motors - Initial state
+
+  /** Initialize motors in stopped state */
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
   digitalWrite(in3, LOW);
   digitalWrite(in4, LOW);
-  
-  // Set initial PWM duty cycle to 0 (motors off)
   ledcWrite(enA, 0);
   ledcWrite(enB, 0);
 }
 
+/**
+ * @brief Main loop that alternates between direction and speed tests.
+ */
 void loop() {
   directionControl();
   delay(1000);
@@ -45,56 +79,66 @@ void loop() {
   delay(1000);
 }
 
-// This function lets you control spinning direction of motors
+/**
+ * @brief Tests motor direction control by running forward and backward.
+ *
+ * Motors are set to full speed and directions are toggled between forward
+ * and reverse to validate H-bridge direction switching.
+ */
 void directionControl() {
-  // Set motors to maximum speed
+  /** Set motors to maximum speed */
   ledcWrite(enA, 255);
   ledcWrite(enB, 255);
-  
-  // Turn on motor A & B (forward direction)
+
+  /** Run motors forward for 2 seconds */
   digitalWrite(in1, HIGH);
   digitalWrite(in2, LOW);
   digitalWrite(in3, HIGH);
   digitalWrite(in4, LOW);
   delay(2000);
-  
-  // Now change motor directions (reverse direction)
+
+  /** Reverse motor direction for 2 seconds */
   digitalWrite(in1, LOW);
   digitalWrite(in2, HIGH);
   digitalWrite(in3, LOW);
   digitalWrite(in4, HIGH);
   delay(2000);
-  
-  // Turn off motors
+
+  /** Stop motors */
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
   digitalWrite(in3, LOW);
   digitalWrite(in4, LOW);
 }
 
-// This function lets you control speed of the motors
+/**
+ * @brief Tests motor speed control by ramping speed up and down.
+ *
+ * Motors run in reverse direction while the PWM duty cycle smoothly
+ * accelerates from 0 to 255 and then decelerates back to 0.
+ */
 void speedControl() {
-  // Turn on motors (reverse direction)
+  /** Set motors to reverse direction */
   digitalWrite(in1, LOW);
   digitalWrite(in2, HIGH);
   digitalWrite(in3, LOW);
   digitalWrite(in4, HIGH);
-  
-  // Accelerate from zero to maximum speed
+
+  /** Gradually accelerate from 0 to maximum speed */
   for (int i = 0; i < 256; i++) {
     ledcWrite(enA, i);
     ledcWrite(enB, i);
     delay(20);
   }
-  
-  // Decelerate from maximum speed to zero
+
+  /** Gradually decelerate from maximum to zero */
   for (int i = 255; i >= 0; --i) {
     ledcWrite(enA, i);
     ledcWrite(enB, i);
     delay(20);
   }
-  
-  // Now turn off motors
+
+  /** Ensure motors are fully stopped */
   digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
   digitalWrite(in3, LOW);
