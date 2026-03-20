@@ -10,17 +10,10 @@
 
 A fully autonomous, Wi-Fi controlled RC rover built as the final project for **CSE 474 - Embedded Systems** at the University of Washington, taught by **Professor John Raiti**.
 
-## Media
-
-### Finished Rover in Action
-https://github.com/user-attachments/assets/IMG_0350.MOV
-
-### Circuit Wiring Diagram
-![Circuit Wiring Diagram](visuals/Screenshot%202026-03-19%20183643.png)
-
-## Overview
-
 This project implements an intelligent RC rover that combines wireless remote control with autonomous obstacle avoidance. The system uses a dual-processor architecture with an ESP32-S3 handling high-level control and wireless communication, while an Arduino Mega manages motor control through an Adafruit Motor Shield.
+
+**Finished Rover in Action:**
+https://github.com/user-attachments/assets/IMG_0350.MOV
 
 ## Features
 
@@ -168,6 +161,8 @@ Commands are transmitted over ESP-NOW at 25 Hz for responsive control.
 **Motor Shield Connections:**
 - Motors connected to M1 (left) and M2 (right)
 - Shield powered from external 12V supply
+
+![Circuit Wiring Diagram](visuals/Screenshot%202026-03-19%20183643.png)
 
 ## ESP-NOW Configuration
 
