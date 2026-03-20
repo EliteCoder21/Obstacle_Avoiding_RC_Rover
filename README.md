@@ -12,8 +12,8 @@ A fully autonomous, Wi-Fi controlled RC rover built as the final project for **C
 
 This project implements an intelligent RC rover that combines wireless remote control with autonomous obstacle avoidance. The system uses a dual-processor architecture with an ESP32-S3 handling high-level control and wireless communication, while an Arduino Mega manages motor control through an Adafruit Motor Shield.
 
-**Finished Rover in Action:**
-https://github.com/user-attachments/assets/IMG_0350.MOV
+**The Finished Product:**
+![Circuit Wiring Diagram](visuals/IMG_0352.JPEG)
 
 ## Features
 
