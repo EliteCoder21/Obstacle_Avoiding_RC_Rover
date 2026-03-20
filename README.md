@@ -8,7 +8,7 @@
 [![Ultrasonic Sensor](https://img.shields.io/badge/-Ultrasonic%20Sensor-00D4FF?style=flat-square)]()
 [![PWM Motor Control](https://img.shields.io/badge/-PWM%20Control-FF6B00?style=flat-square)]()
 
-A fully autonomous, Wi-Fi controlled RC rover built as the final project for **CSE 474 - Embedded Systems** at Stony Brook University, taught by **Professor John Raiti**.
+A fully autonomous, Wi-Fi controlled RC rover built as the final project for **CSE 474 - Embedded Systems** at the University of Washington, taught by **Professor John Raiti**.
 
 ## Overview
 
@@ -188,8 +188,7 @@ The project includes hardware test files for validating individual components:
 
 - **Course**: CSE 474 - Introduction to Embedded Systems
 - **Instructor**: Professor John Raiti
-- **Institution**: Stony Brook University
-- **Semester**: Fall 2024
+- **Institution**: University of Washington
 
 ## Authors
 
